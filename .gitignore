@@ -3,7 +3,6 @@
 *.docx
 *.jpg
 *.png
-CLAUDE.md
 PLAN-*.md
 *-CONTEXT.md
 conversation-history.md
