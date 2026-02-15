@@ -1,0 +1,724 @@
+{
+  "id": "g7oQLO7sJpaDohH9",
+  "name": "Manulift AI Lead Qualification Demo v2",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "587f526d-f85b-45a3-8d1e-5209d9e280d9",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-2064, 272]
+    },
+    {
+      "parameters": {
+        "path": "manulift-demo",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "02fae54c-acb6-44ab-b929-743357ce5259",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-2064, 464],
+      "webhookId": "YOUR_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Qualified Leads",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "76263022-9e62-481c-91e8-682dee742bf3",
+      "name": "Read Qualified Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [-1840, 368],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR_GOOGLE_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "maxItems": 10
+      },
+      "id": "36eab1b8-d04f-4246-8562-921a8199aec0",
+      "name": "Limit to 10",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [-1392, 368]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "672fbe16-9d15-49f9-a9da-fcdacfe106e9",
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-1168, 368]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Classify this FB Marketplace listing and return the result as JSON.\nIMPORTANT: Include the description, fb_seller_type, and seller_name EXACTLY as provided in your output JSON.\n\ntitle: {{ $json['Listing Title'] }}\nprice: {{ $json['Price'] }}\nlocation: {{ $json['Location'] || '' }}\nequipment_type: {{ $json['Equipment Type'] || '' }}\nbrand: {{ $json['Brand'] || '' }}\ndescription: {{ $json['Description'] || 'NO DESCRIPTION' }}\nfb_seller_type: {{ $json['FB Seller Type'] || 'unknown' }}\nseller_name: {{ $json['Seller Name'] || 'unknown' }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a lead qualification assistant for Manulift, a Canadian heavy equipment dealer selling telehandlers, boom lifts, scissor lifts, and manlifts.\n\nIMPORTANT: Price alone does NOT indicate dealer vs private. Heavy equipment costs $15K-$150K+ regardless of seller type.\n\nFor each listing, classify based on title, description, and fb_seller_type.\n\nDEALER (we do NOT want these — they're competitors):\n- Financing language: \"lease\", \"finance\", \"$0 down\", \"OAC\", \"payments as low as\"\n- Marketing speak: bullet-pointed features, promotional formatting\n- Multiple inventory hints: \"other equipment available\", \"multiple units\", \"also in stock\"\n- Brand new with warranty packages: \"BRAND NEW\" + warranty + multiple units\n- Professional formatting with asterisks, dots as spacers\n\nRENTAL (we do NOT want — rental companies, not buyers):\n- Rate language: \"daily rates\", \"weekly rates\", \"monthly rates\", \"hourly\"\n- Fleet indicators: multiple equipment types listed, 1-800 numbers\n\nPRIVATE_SELLER (we WANT these — potential Manulift customers):\n- Personal ownership language: \"my\", \"I bought\", \"selling because\", \"don't need\"\n- Specific usage history: exact hours, maintenance done by owner\n- Single item, no other inventory mentioned\n- Honest condition notes: mentions wear, issues, things that need fixing\n\nUNCERTAIN (needs manual review):\n- No description available or short description with no clear signals\n\nDISQUALIFY:\n- Parts/accessories under $500\n- Not heavy equipment\n\nReturn JSON with: seller_type (PRIVATE_SELLER|DEALER|RENTAL|UNCERTAIN|DISQUALIFY), reason (brief explanation)",
+          "maxIterations": 1,
+          "returnIntermediateSteps": false
+        }
+      },
+      "id": "418701af-e624-4528-a675-a6e0d5d793b3",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [176, 288]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "maxTokens": 500,
+          "temperature": 0.1
+        }
+      },
+      "id": "2eb62a8d-538c-437a-9114-d7a6dd94449c",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [160, 512],
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR_OPENAI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"seller_type\":\"DEALER\",\n  \"reason\":\"Contains dealer language\"\n}"
+      },
+      "id": "ffe89856-d87c-4df5-9b75-8fb01d172c49",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [320, 512]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "url",
+              "name": "Listing URL",
+              "value": "={{ $('Split In Batches').item.json['Listing URL'] }}",
+              "type": "string"
+            },
+            {
+              "id": "title",
+              "name": "Listing Title",
+              "value": "={{ $('Split In Batches').item.json['Listing Title'] }}",
+              "type": "string"
+            },
+            {
+              "id": "price",
+              "name": "Price",
+              "value": "={{ $('Split In Batches').item.json['Price'] }}",
+              "type": "string"
+            },
+            {
+              "id": "loc",
+              "name": "Location",
+              "value": "={{ $('Split In Batches').item.json['Location'] }}",
+              "type": "string"
+            },
+            {
+              "id": "equip",
+              "name": "Equipment Type",
+              "value": "={{ $('Split In Batches').item.json['Equipment Type'] }}",
+              "type": "string"
+            },
+            {
+              "id": "brand",
+              "name": "Brand",
+              "value": "={{ $('Split In Batches').item.json['Brand'] }}",
+              "type": "string"
+            },
+            {
+              "id": "desc",
+              "name": "Description",
+              "value": "={{ JSON.parse($json.output.replace('```json','').replace('```','').trim()).description || $json['Description'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "fbtype",
+              "name": "FB Seller Type",
+              "value": "={{ JSON.parse($json.output.replace('```json','').replace('```','').trim()).fb_seller_type || $json['FB Seller Type'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "seller",
+              "name": "Seller Name",
+              "value": "={{ JSON.parse($json.output.replace('```json','').replace('```','').trim()).seller_name || $json['Seller Name'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "st",
+              "name": "AI Seller Type",
+              "value": "={{ JSON.parse($json.output.replace('```json','').replace('```','').trim()).seller_type || 'UNCERTAIN' }}",
+              "type": "string"
+            },
+            {
+              "id": "conf",
+              "name": "AI Confidence",
+              "value": "={{ String(JSON.parse($json.output.replace('```json','').replace('```','').trim()).confidence || 50) }}",
+              "type": "string"
+            },
+            {
+              "id": "reason",
+              "name": "AI Reason",
+              "value": "={{ JSON.parse($json.output.replace('```json','').replace('```','').trim()).reason || 'No classification' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9bd01510-ce6f-4d19-a328-0dd480eb6c8b",
+      "name": "Merge AI Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [528, 288]
+    },
+    {
+      "parameters": {},
+      "id": "4c5db80c-fbba-4c46-933a-f54f1ad067d1",
+      "name": "Loop Back",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [976, 464]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "url",
+              "name": "Listing URL",
+              "value": "={{ $('Split In Batches').item.json['Listing URL'] }}",
+              "type": "string"
+            },
+            {
+              "id": "title",
+              "name": "Listing Title",
+              "value": "={{ $json.marketplace_listing_title || $json.custom_title_with_labels_and_formatted_price || $('Split In Batches').item.json['Listing Title'] }}",
+              "type": "string"
+            },
+            {
+              "id": "price",
+              "name": "Price",
+              "value": "={{ ($json.listing_price && $json.listing_price.formatted_amount) || $('Split In Batches').item.json['Price'] }}",
+              "type": "string"
+            },
+            {
+              "id": "loc",
+              "name": "Location",
+              "value": "={{ ($json.location && $json.location.reverse_geocode && ($json.location.reverse_geocode.city || $json.location.reverse_geocode.state)) || $('Split In Batches').item.json['Location'] }}",
+              "type": "string"
+            },
+            {
+              "id": "equip",
+              "name": "Equipment Type",
+              "value": "={{ $('Split In Batches').item.json['Equipment Type'] }}",
+              "type": "string"
+            },
+            {
+              "id": "brand",
+              "name": "Brand",
+              "value": "={{ $('Split In Batches').item.json['Brand'] }}",
+              "type": "string"
+            },
+            {
+              "id": "desc",
+              "name": "Description",
+              "value": "={{ $json.description.text|| 'No description available' }}",
+              "type": "string"
+            },
+            {
+              "id": "img1",
+              "name": "Image URL 1",
+              "value": "={{ $json.listingPhotos[0].image.uri }}",
+              "type": "string"
+            },
+            {
+              "id": "img2",
+              "name": "Image URL 2",
+              "value": "={{ $json.listingPhotos[1]?.image?.uri }}",
+              "type": "string"
+            },
+            {
+              "id": "img3",
+              "name": "Image URL 3",
+              "value": "={{ $json.listingPhotos[2].image.uri }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5940278d-2d1c-41f9-bc2c-d85e717379f9",
+      "name": "Extract Description",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-48, 288]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has_desc",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json['Description'] }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "701f2a7f-5b45-4672-ba58-3ec85d20db71",
+      "name": "Already Enriched?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-944, 240]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "url",
+              "name": "Listing URL",
+              "value": "={{ $json['Listing URL'] }}",
+              "type": "string"
+            },
+            {
+              "id": "title",
+              "name": "Listing Title",
+              "value": "={{ $json['Listing Title'] }}",
+              "type": "string"
+            },
+            {
+              "id": "price",
+              "name": "Price",
+              "value": "={{ $json['Price'] }}",
+              "type": "string"
+            },
+            {
+              "id": "loc",
+              "name": "Location",
+              "value": "={{ $json['Location'] }}",
+              "type": "string"
+            },
+            {
+              "id": "equip",
+              "name": "Equipment Type",
+              "value": "={{ $json['Equipment Type'] }}",
+              "type": "string"
+            },
+            {
+              "id": "brand",
+              "name": "Brand",
+              "value": "={{ $json['Brand'] }}",
+              "type": "string"
+            },
+            {
+              "id": "desc",
+              "name": "Description",
+              "value": "={{ $json['Description'] }}",
+              "type": "string"
+            },
+            {
+              "id": "fbtype",
+              "name": "FB Seller Type",
+              "value": "={{ $json['FB Seller Type'] || 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "seller",
+              "name": "Seller Name",
+              "value": "={{ $json['Seller Name'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "row",
+              "name": "row_number",
+              "value": "={{ $json.row_number }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a3811805-017a-4922-830e-03763e12cbff",
+      "name": "Use Cached Description",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-48, 96]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "no_ai",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json['AI Seller Type'] }}",
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e1e483a2-719b-4b7d-b23c-959f4e3e1f76",
+      "name": "Not Yet Classified?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-1616, 368]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Qualified Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Description": "={{ $json.Description }}",
+            "FB Seller Type": "={{ $json['FB Seller Type'] }}",
+            "Seller Name": "={{ $json['Seller Name'] }}",
+            "AI Seller Type": "={{ $json['AI Seller Type'] }}",
+            "AI Confidence": "={{ $json['AI Confidence'] }}",
+            "AI Reason": "={{ $json['AI Reason'] }}",
+            "Listing URL": "={{ $json[\"Listing URL\"] }}",
+            "Listing Title": "={{ $json[\"Listing Title\"] }}",
+            "Price": "={{ $json.Price }}",
+            "Location": "={{ $json.Location }}",
+            "Equipment Type": "={{ $json[\"Equipment Type\"] }}",
+            "Brand": "={{ $json.Brand }}"
+          },
+          "matchingColumns": ["Listing URL"],
+          "schema": [
+            {"id": "Listing URL", "displayName": "Listing URL", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Listing Title", "displayName": "Listing Title", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Price", "displayName": "Price", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Location", "displayName": "Location", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Equipment Type", "displayName": "Equipment Type", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Brand", "displayName": "Brand", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Contacted", "displayName": "Contacted", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Description", "displayName": "Description", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Seller Name", "displayName": "Seller Name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "FB Seller Type", "displayName": "FB Seller Type", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "AI Seller Type", "displayName": "AI Seller Type", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "AI Confidence", "displayName": "AI Confidence", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "AI Reason", "displayName": "AI Reason", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "Notes", "displayName": "Notes", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Image URLs", "displayName": "Image URLs", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false}
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "59c4c4de-c7fc-4cdb-a5d6-650e0940d1b0",
+      "name": "Update Qualified Leads Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [752, 288],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR_GOOGLE_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/apify~facebook-marketplace-scraper/runs",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "apifyApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "waitForFinish",
+              "value": "60"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "startUrls",
+              "value": "={{ [{ url: $('Split In Batches').item.json['Listing URL'] }] }}"
+            },
+            {
+              "name": "resultsLimit",
+              "value": "={{1}}"
+            },
+            {
+              "name": "includeListingDetails",
+              "value": "={{true}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "id": "072aee72-527f-494a-a1e1-55677d49060f",
+      "name": "Run FB Details Scraper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-720, 336],
+      "credentials": {
+        "apifyApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR_APIFY_CREDENTIAL"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.apify.com/v2/datasets/{{ $json.data.defaultDatasetId }}/items?token=YOUR_APIFY_TOKEN",
+        "options": {}
+      },
+      "id": "8a836da9-563b-4644-98d1-212bef2ccc8a",
+      "name": "Get Enrichment Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-496, 336],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "check",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "241b797b-e3b2-4074-8a74-f14e793bb600",
+      "name": "Has Apify Data?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-272, 336]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "title",
+              "name": "Listing Title",
+              "value": "={{ $('Split In Batches').item.json['Listing Title'] }}",
+              "type": "string"
+            },
+            {
+              "id": "price",
+              "name": "Price",
+              "value": "={{ $('Split In Batches').item.json['Price'] }}",
+              "type": "string"
+            },
+            {
+              "id": "loc",
+              "name": "Location",
+              "value": "={{ $('Split In Batches').item.json['Location'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "et",
+              "name": "Equipment Type",
+              "value": "={{ $('Split In Batches').item.json['Equipment Type'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "br",
+              "name": "Brand",
+              "value": "={{ $('Split In Batches').item.json['Brand'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "desc",
+              "name": "Description",
+              "value": "N/A - Listing no longer available on Facebook Marketplace",
+              "type": "string"
+            },
+            {
+              "id": "fbtype",
+              "name": "FB Seller Type",
+              "value": "unknown",
+              "type": "string"
+            },
+            {
+              "id": "seller",
+              "name": "Seller Name",
+              "value": "unknown",
+              "type": "string"
+            },
+            {
+              "id": "images",
+              "name": "Image URLs",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f7f760fe-c590-47b4-b8be-56f2dc1074a1",
+      "name": "No Apify Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-48, 480]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{"node": "Read Qualified Leads", "type": "main", "index": 0}]]
+    },
+    "Webhook Trigger": {
+      "main": [[{"node": "Read Qualified Leads", "type": "main", "index": 0}]]
+    },
+    "Read Qualified Leads": {
+      "main": [[{"node": "Not Yet Classified?", "type": "main", "index": 0}]]
+    },
+    "Limit to 10": {
+      "main": [[{"node": "Split In Batches", "type": "main", "index": 0}]]
+    },
+    "Split In Batches": {
+      "main": [[], [{"node": "Already Enriched?", "type": "main", "index": 0}]]
+    },
+    "AI Agent": {
+      "main": [[{"node": "Merge AI Result", "type": "main", "index": 0}]]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [[{"node": "AI Agent", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Merge AI Result": {
+      "main": [[{"node": "Update Qualified Leads Row", "type": "main", "index": 0}]]
+    },
+    "Loop Back": {
+      "main": [[{"node": "Split In Batches", "type": "main", "index": 0}]]
+    },
+    "Extract Description": {
+      "main": [[{"node": "AI Agent", "type": "main", "index": 0}]]
+    },
+    "Already Enriched?": {
+      "main": [
+        [{"node": "Use Cached Description", "type": "main", "index": 0}],
+        [{"node": "Run FB Details Scraper", "type": "main", "index": 0}]
+      ]
+    },
+    "Use Cached Description": {
+      "main": [[{"node": "AI Agent", "type": "main", "index": 0}]]
+    },
+    "Not Yet Classified?": {
+      "main": [[{"node": "Limit to 10", "type": "main", "index": 0}]]
+    },
+    "Update Qualified Leads Row": {
+      "main": [[{"node": "Loop Back", "type": "main", "index": 0}]]
+    },
+    "Run FB Details Scraper": {
+      "main": [[{"node": "Get Enrichment Data", "type": "main", "index": 0}]]
+    },
+    "Get Enrichment Data": {
+      "main": [[{"node": "Has Apify Data?", "type": "main", "index": 0}]]
+    },
+    "Has Apify Data?": {
+      "main": [
+        [{"node": "Extract Description", "type": "main", "index": 0}],
+        [{"node": "No Apify Data", "type": "main", "index": 0}]
+      ]
+    },
+    "No Apify Data": {
+      "main": [[{"node": "AI Agent", "type": "main", "index": 0}]]
+    },
+    "Structured Output Parser": {
+      "main": [[]],
+      "ai_outputParser": [[{"node": "AI Agent", "type": "ai_outputParser", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
