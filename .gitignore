@@ -8,3 +8,7 @@ PLAN-*.md
 conversation-history.md
 workflow-summaries.md
 sanitize.js
+
+# Local/private artifacts
+facebook-cookies.txt
+workflow-backup-*.json

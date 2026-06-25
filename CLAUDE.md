@@ -88,7 +88,7 @@
 ### Google Sheet
 - **Spreadsheet ID:** `1CXHKn6J03zSoh4jOiw43mSWcHYTa0uzLr8yUJstszmk`
 - **Title:** Manulift FB Marketplace Leads
-- **Sheets:** Keyword Pool, Qualified Leads
+- **Sheets:** Keyword Pool, Qualified Leads, AI Results
 
 ### Apify
 - **Actor:** `apify/facebook-marketplace-scraper`
@@ -107,7 +107,7 @@
 
 ### Data Flow
 ```
-Webhook Trigger (GET /webhook-test/...)
+Webhook Trigger (GET /webhook/manulift-demo, responseMode: onReceived)
     ↓
 Read Sheet Rows (Google Sheets - Qualified Leads)
     ↓
@@ -118,7 +118,7 @@ Run FB Details Scraper (Apify actor: apify/facebook-marketplace-scraper)
 Get Enrichment Data (Apify dataset results)
     ↓
 Has Apify Data? (IF node)
-    ├── YES → Extract Description (title, price, location, brand, equipment type, images)
+    ├── YES → Extract Description (title, price, location, brand, equipment type, images, inventory_type, listing_category)
     │         ↓
     │         Has Images? (IF node - checks Images array length > 0)
     │         ├── YES → Analyze Listing Images (Code node - downloads images, base64 encodes)
@@ -132,7 +132,8 @@ Has Apify Data? (IF node)
                 ↓
 AI Agent (gpt-4o-mini + Structured Output Parser)
     - Classifies: PRIVATE_SELLER, DEALER, RENTAL, DISQUALIFY, UNCERTAIN
-    - Uses text (title, description, price, location) + image analysis context
+    - Uses text (title, description, price, location) + inventory_type + listing_category + image analysis context
+    - Enhanced prompt with detailed dealer/private seller signal detection
     ↓
 Merge AI Result (Set node - combines classification fields)
     ↓
@@ -166,14 +167,25 @@ The image analysis pipeline downloads FB Marketplace listing photos server-side 
 
 ### AI Agent Classification
 
-The AI Agent receives text fields + image analysis JSON and outputs structured classification:
+The AI Agent receives text fields + inventory_type + listing_category + image analysis JSON and outputs structured classification:
 - `seller_type`: PRIVATE_SELLER | DEALER | RENTAL | DISQUALIFY | UNCERTAIN
-- `confidence`: 1-100
-- `equipment_type`: telehandler | manlift | scissor_lift | other | unknown
-- `brand_detected`: string or null
-- `disqualify_reason`: string (if applicable)
-- `notes`: brief explanation
+- `reason`: brief explanation citing specific signals found
 - `image_summary`: what the listing photos show
+
+**Enhanced dealer detection signals (added Feb 2026):**
+- Financing/leasing language, warranty/service packages, business name/address in description
+- Professional formatting (bullet points, emoji headers, structured marketing copy)
+- Multiple units/inventory mentioned, delivery across regions
+- 1-800 numbers, business emails, website URLs
+
+**Enhanced private seller signals:**
+- Personal pronouns ("I bought", "my machine"), reason for selling
+- Specific personal usage history, honest condition notes
+- Casual formatting, single cell phone number, location-specific pickup
+
+**Enhanced image analysis signals:**
+- Dealer: organized lots, business signage, professional photography, pressure-washed machines, showroom/warehouse settings
+- Private: residential/farm/jobsite settings, casual phone photos, single machine, personal items visible, dirt/mud on equipment
 
 ## Original Scraper Workflow (Reference)
 
@@ -244,6 +256,20 @@ The AI Agent receives text fields + image analysis JSON and outputs structured c
 ### Postal Code Pattern
 `/^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/`
 
+## Facebook Metadata Fields (Verified Feb 2026)
+
+Tested 8 real listings with `patient_discovery/facebook-marketplace-details` actor. Key findings:
+
+| Field | Reliability | Notes |
+|-------|-----------|-------|
+| `vehicle_seller_type` | **UNRELIABLE** | Always returns PRIVATE_SELLER when present — confirmed dealers get PRIVATE_SELLER too. Only available for Vehicles category. Do NOT use for classification. |
+| `is_seller_business_onboarded` | **UNRELIABLE** | Always `false` in our sample. Useless for dealer detection. |
+| `listing_inventory_type` | **WEAK signal** | EVERGREEN may indicate dealer (persistent listings). SINGLE_QUANTITY is neutral. Available from existing Apify response — no extra API call needed. |
+| `marketplace_listing_category_name` | **INFORMATIONAL** | Vehicles, Tools, Miscellaneous. Passed to AI for context. |
+| `marketplace_listing_seller` | **null** | Facebook locked down all seller identity data from anonymous/cookieless scrapers. All tested actors return null. |
+
+**Bottom line:** Facebook metadata is not useful for dealer detection. The AI Agent relies on text analysis (primary) and image analysis (secondary) for classification. Seller profile scraping requires authenticated access (see Phase 2 plan).
+
 ## n8n Technical Notes
 
 ### Code Node Limitations (n8n v2 sandbox)
@@ -265,7 +291,9 @@ The AI Agent receives text fields + image analysis JSON and outputs structured c
 
 - `Aaron - Manulift.pdf` - Client specification document with keywords and message templates
 - `AI-Lead-Qualification-Plan.md` - Initial plan for AI-powered lead qualification (Phase 1: text, Phase 2: images)
+- `PHASE-2-SELLER-PROFILE-SCRAPING.md` - Future plan for cookie-based Puppeteer seller profile scraping (with toggle to enable/disable)
 - `conversation-history.md` - DM history with Aaron and project context
+- `screenshots/` - Reference screenshots of seller profiles (Ryan & Mike = private sellers, Patrick = dealer)
 - `CLAUDE.md` - This documentation file
 
 ## Success Metrics
